@@ -34,7 +34,10 @@ def asgi_csrf_decorator(
                     if should_set_cookie:
                         original_headers = event.get("headers") or []
                         set_cookie_headers = [
-                            (b"set-cookie", "{}={}".format(cookie_name, csrftoken))
+                            (
+                                b"set-cookie",
+                                "{}={}".format(cookie_name, csrftoken).encode("utf-8"),
+                            )
                         ]
                         event = {
                             "type": "http.response.start",
