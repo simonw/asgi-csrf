@@ -101,7 +101,7 @@ async def _parse_form_urlencoded(receive):
         more_body = message.get("more_body", False)
 
     async def replay_receive():
-        return messages.pop()
+        return messages.pop(0)
 
     return dict(parse_qsl(body.decode("utf-8"))), replay_receive
 

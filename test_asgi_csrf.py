@@ -3,6 +3,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 from asgi_csrf import asgi_csrf
 import httpx
+import json
 import pytest
 
 CSRF_TOKEN = "9izX9q37XP9knNNQ"
@@ -10,37 +11,26 @@ CSRF_TOKEN = "9izX9q37XP9knNNQ"
 
 async def hello_world(request):
     if request.method == "POST":
+        data = await request.form()
         return JSONResponse(dict(await request.form()))
     return JSONResponse({"hello": "world"})
 
 
-hello_world_app = Starlette(routes=[Route("/", hello_world),])
-
-
-async def hello_world_app(scope, receive, send):
-    assert scope["type"] == "http"
-    await send(
-        {
-            "type": "http.response.start",
-            "status": 200,
-            "headers": [[b"content-type", b"application/json"]],
-        }
-    )
-    await send({"type": "http.response.body", "body": b'{"hello": "world"}'})
+hello_world_app = Starlette(routes=[Route("/", hello_world, methods=["GET", "POST"]),])
 
 
 @pytest.mark.asyncio
 async def test_hello_world_app():
     async with httpx.AsyncClient(app=hello_world_app) as client:
         response = await client.get("http://localhost/")
-    assert b'{"hello": "world"}' == response.content
+    assert b'{"hello":"world"}' == response.content
 
 
 @pytest.mark.asyncio
 async def test_asgi_csrf_sets_cookie():
     async with httpx.AsyncClient(app=asgi_csrf(hello_world_app)) as client:
         response = await client.get("http://localhost/")
-    assert b'{"hello": "world"}' == response.content
+    assert b'{"hello":"world"}' == response.content
     assert "csrftoken" in response.cookies
 
 
@@ -50,7 +40,7 @@ async def test_asgi_csrf_does_not_set_cookie_if_one_sent():
         response = await client.get(
             "http://localhost/", cookies={"csrftoken": CSRF_TOKEN}
         )
-    assert b'{"hello": "world"}' == response.content
+    assert b'{"hello":"world"}' == response.content
     assert "csrftoken" not in response.cookies
 
 
@@ -86,10 +76,11 @@ async def test_allows_post_if_cookie_duplicated_in_post_data():
     async with httpx.AsyncClient(app=asgi_csrf(hello_world_app)) as client:
         response = await client.post(
             "http://localhost/",
-            data={"csrftoken": CSRF_TOKEN},
+            data={"csrftoken": CSRF_TOKEN, "hello": "world"},
             cookies={"csrftoken": CSRF_TOKEN},
         )
     assert 200 == response.status_code
+    assert {"csrftoken": CSRF_TOKEN, "hello": "world"} == json.loads(response.content)
 
 
 @pytest.mark.asyncio
