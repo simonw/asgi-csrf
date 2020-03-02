@@ -1,8 +1,20 @@
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 from asgi_csrf import asgi_csrf
 import httpx
 import pytest
 
 CSRF_TOKEN = "9izX9q37XP9knNNQ"
+
+
+async def hello_world(request):
+    if request.method == "POST":
+        return JSONResponse(dict(await request.form()))
+    return JSONResponse({"hello": "world"})
+
+
+hello_world_app = Starlette(routes=[Route("/", hello_world),])
 
 
 async def hello_world_app(scope, receive, send):

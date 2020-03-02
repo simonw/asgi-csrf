@@ -22,5 +22,5 @@ setup(
     license="Apache License, Version 2.0",
     version=VERSION,
     py_modules=["asgi_csrf"],
-    extras_require={"test": ["pytest", "pytest-asyncio", "httpx",]},
+    extras_require={"test": ["pytest", "pytest-asyncio", "httpx", "starlette"]},
 )
