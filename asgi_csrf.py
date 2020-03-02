@@ -17,7 +17,7 @@ def asgi_csrf_decorator(
 ):
     def _asgi_csrf_decorator(app):
         @wraps(app)
-        async def app_wrapped_with_csrf(scope, recieve, send):
+        async def app_wrapped_with_csrf(scope, receive, send):
             cookies = cookies_from_scope(scope)
             csrftoken = None
             should_set_cookie = False
@@ -45,7 +45,7 @@ def asgi_csrf_decorator(
 
             # Apply to anything that isn't GET, HEAD, OPTIONS, TRACE (like Django does)
             if scope["method"] in {"GET", "HEAD", "OPTIONS", "TRACE"}:
-                await app(scope, recieve, wrapped_send)
+                await app(scope, receive, wrapped_send)
             else:
                 # Check for CSRF token in various places
                 headers = dict(scope.get("headers" or []))
@@ -54,16 +54,16 @@ def asgi_csrf_decorator(
                     == csrftoken
                 ):
                     # x-csrftoken header matches
-                    await app(scope, recieve, wrapped_send)
+                    await app(scope, receive, wrapped_send)
                     return
                 # We need to look for it in the POST body
                 content_type = headers.get(b"content-type", b"").split(b";", 1)[0]
                 if content_type == b"application/x-www-form-urlencoded":
                     # Consume entire POST body and check for csrftoken field
-                    post_data, replay_recieve = await _parse_form_urlencoded(recieve)
+                    post_data, replay_receive = await _parse_form_urlencoded(receive)
                     if secrets.compare_digest(post_data.get(form_input, ""), csrftoken):
                         # All is good! Forward on the request and replay the body
-                        await app(scope, replay_recieve, wrapped_send)
+                        await app(scope, replay_receive, wrapped_send)
                         return
                     else:
                         await send_csrf_failed(
@@ -87,7 +87,7 @@ def asgi_csrf_decorator(
 
 async def _parse_form_urlencoded(receive):
     # Returns {key: value}, replay_receive
-    # where replay_recieve is an awaitable that can replay what was recieved
+    # where replay_receive is an awaitable that can replay what was received
     # We ignore cases like foo=one&foo=two because we do not need to
     # handle that case for our single csrftoken= argument
     body = b""
