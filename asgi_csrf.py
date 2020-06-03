@@ -1,32 +1,52 @@
 from http.cookies import SimpleCookie
 import fnmatch
 from functools import wraps
+import os
 from urllib.parse import parse_qsl
+from itsdangerous.url_safe import URLSafeSerializer
+from itsdangerous import BadSignature
 import secrets
 
 DEFAULT_COOKIE_NAME = "csrftoken"
 DEFAULT_FORM_INPUT = "csrftoken"
 DEFAULT_HTTP_HEADER = "x-csrftoken"
+DEFAULT_SIGNING_NAMESPACE = "csrftoken"
 SCOPE_KEY = "csrftoken"
+ENV_SECRET = "ASGI_CSRF_SECRET"
 
 
 def asgi_csrf_decorator(
     cookie_name=DEFAULT_COOKIE_NAME,
     http_header=DEFAULT_HTTP_HEADER,
     form_input=DEFAULT_FORM_INPUT,
+    signing_secret=None,
+    signing_namespace=DEFAULT_SIGNING_NAMESPACE,
 ):
+    if signing_secret is None:
+        signing_secret = os.environ.get(ENV_SECRET, None)
+    if signing_secret is None:
+        signing_secret = make_secret(128)
+    signer = URLSafeSerializer(signing_secret)
+
     def _asgi_csrf_decorator(app):
         @wraps(app)
         async def app_wrapped_with_csrf(scope, receive, send):
             cookies = cookies_from_scope(scope)
             csrftoken = None
             should_set_cookie = False
+            should_set_cookie = True
             if cookie_name in cookies:
-                csrftoken = cookies[cookie_name]
-            else:
+                try:
+                    csrftoken = cookies.get(cookie_name, "")
+                    signer.loads(csrftoken, signing_namespace)
+                except BadSignature:
+                    csrftoken = ""
+                    should_set_cookie = True
+                else:
+                    should_set_cookie = False
+            if should_set_cookie:
                 # We are going to set that cookie
-                should_set_cookie = True
-                csrftoken = make_secret(16)
+                csrftoken = signer.dumps(make_secret(16), signing_namespace)
             scope = {**scope, **{SCOPE_KEY: csrftoken}}
 
             async def wrapped_send(event):
@@ -121,8 +141,19 @@ async def send_csrf_failed(scope, send, message="CSRF check failed"):
     await send({"type": "http.response.body", "body": message.encode("utf-8")})
 
 
-def asgi_csrf(app, cookie_name=DEFAULT_COOKIE_NAME, http_header=DEFAULT_HTTP_HEADER):
-    return asgi_csrf_decorator(cookie_name, http_header)(app)
+def asgi_csrf(
+    app,
+    cookie_name=DEFAULT_COOKIE_NAME,
+    http_header=DEFAULT_HTTP_HEADER,
+    signing_secret=None,
+    signing_namespace=DEFAULT_SIGNING_NAMESPACE,
+):
+    return asgi_csrf_decorator(
+        cookie_name,
+        http_header,
+        signing_secret=signing_secret,
+        signing_namespace=signing_namespace,
+    )(app)
 
 
 def cookies_from_scope(scope):
