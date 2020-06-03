@@ -6,19 +6,49 @@
 
 ASGI middleware for protecting against CSRF attacks
 
-**This is a preview release - do not assume that this is robust and secure just yet.**
-
 ## Installation
 
     pip install asgi-csrf
 
 ## Background
 
-See the [OWASP guide to Cross Site Request Forgery (CSRF)](https://owasp.org/www-community/attacks/csrf) and their [Cross-Site Request Forgery (CSRF) Prevention Cheat Sheet](https://owasp.org/www-project-cheat-sheets/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet).
+See the [OWASP guide to Cross Site Request Forgery (CSRF)](https://owasp.org/www-community/attacks/csrf) and their [Cross-Site Request Forgery (CSRF) Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).
 
-This middleware implements the Double Submit Cookie pattern, where a cookie is set that is then compared to a `csrftoken` hidden form field or a `x-csrftoken` HTTP header.
+This middleware implements the [Double Submit Cookie pattern](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#double-submit-cookie), where a cookie is set that is then compared to a `csrftoken` hidden form field or a `x-csrftoken` HTTP header.
+
+## Usage
+
+Decorate your ASGI application like this:
+
+```python
+from asgi_csrf import asgi_csrf
+from .my_asgi_app import app
+
+
+app = asgi_csrf(app, signing_secret="secret-goes-here")
+```
+
+The middleware will set a `csrftoken` cookie, if one is missing. The value of that token will be made available as `scope["csrftoken]` to your ASGI application.
+
+Your application code should include that value as a hidden form field in any POST forms:
+
+```html
+<form action="/login" method="POST">
+    ...
+    <input type="hidden" name="csrftoken" value="{{ request.scope.csrftoken }}">
+</form>
+```
+
+The middleware will return a 403 forbidden error for any POST requests that do not include the matching `csrftoken` - either in the POST data or in a `x-csrftoken` HTTP header (useful for JavaScript `fetch()` calls).
+
+The `signing_secret` is used to sign the tokens, to protect against subdomain vulnerabilities.
+
+If you do not pass in an explicit `signing_secret` parameter, the middleware will look for a `ASGI_CSRF_SECRET` environment variable.
+
+If it cannot find that environment variable, it will generate a random secret which will persist for the lifetime of the server.
+
+This means that if you do not configure a specific secret your user's `csrftoken` cookies will become invalid every time the server restarts! You should configure a secret.
 
 ## Limitations
 
-* Brand new. Not extensively tested. Do not trust this yet.
 * Currently only works for `application/x-www-form-urlencoded` forms, not `multipart/form-data` forms (with file uploads)
