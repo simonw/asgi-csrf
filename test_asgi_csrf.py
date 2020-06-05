@@ -11,7 +11,7 @@ SECRET = "secret"
 
 
 async def hello_world(request):
-    if "csrftoken" in request.scope:
+    if "csrftoken" in request.scope and "_no_token" not in request.query_params:
         print(request.scope["csrftoken"]())
     if request.method == "POST":
         data = await request.form()
@@ -72,11 +72,31 @@ async def test_asgi_csrf_modifies_existing_vary_header(app_csrf):
 
 
 @pytest.mark.asyncio
-async def test_asgi_csrf_sets_no_cookie_if_page_has_no_form(app_csrf):
+async def test_asgi_csrf_sets_no_cookie_or_vary_if_page_has_no_form(app_csrf):
     async with httpx.AsyncClient(app=app_csrf) as client:
         response = await client.get("http://localhost/static")
     assert b'{"hello":"world","static":true}' == response.content
     assert "csrftoken" not in response.cookies
+    assert "vary" not in response.headers
+
+
+@pytest.mark.asyncio
+async def test_vary_header_only_if_page_contains_csrftoken(app_csrf, csrftoken):
+    async with httpx.AsyncClient(app=app_csrf) as client:
+        assert (
+            "vary"
+            in (
+                await client.get("http://localhost/", cookies={"csrftoken": csrftoken})
+            ).headers
+        )
+        assert (
+            "vary"
+            not in (
+                await client.get(
+                    "http://localhost/?_no_token=1", cookies={"csrftoken": csrftoken}
+                )
+            ).headers
+        )
 
 
 @pytest.mark.asyncio

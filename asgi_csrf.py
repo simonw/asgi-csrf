@@ -35,6 +35,7 @@ def asgi_csrf_decorator(
             csrftoken = None
             has_csrftoken_cookie = False
             should_set_cookie = False
+            page_needs_vary_cookie = False
             if cookie_name in cookies:
                 try:
                     csrftoken = cookies.get(cookie_name, "")
@@ -48,6 +49,8 @@ def asgi_csrf_decorator(
 
             def get_csrftoken():
                 nonlocal should_set_cookie
+                nonlocal page_needs_vary_cookie
+                page_needs_vary_cookie = True
                 if not has_csrftoken_cookie:
                     should_set_cookie = True
                 return csrftoken
@@ -56,10 +59,10 @@ def asgi_csrf_decorator(
 
             async def wrapped_send(event):
                 if event["type"] == "http.response.start":
-                    if should_set_cookie:
-                        original_headers = event.get("headers") or []
-                        new_headers = []
-                        # Loop through original headers in case we need to modify "vary"
+                    original_headers = event.get("headers") or []
+                    new_headers = []
+                    if page_needs_vary_cookie:
+                        # Loop through original headers, modify or add "vary"
                         found_vary = False
                         for key, value in original_headers:
                             if key == b"vary":
@@ -71,6 +74,7 @@ def asgi_csrf_decorator(
                             new_headers.append((key, value))
                         if not found_vary:
                             new_headers.append((b"vary", b"Cookie"))
+                    if should_set_cookie:
                         new_headers.append(
                             (
                                 b"set-cookie",
@@ -79,11 +83,11 @@ def asgi_csrf_decorator(
                                 ),
                             )
                         )
-                        event = {
-                            "type": "http.response.start",
-                            "status": event["status"],
-                            "headers": new_headers,
-                        }
+                    event = {
+                        "type": "http.response.start",
+                        "status": event["status"],
+                        "headers": new_headers,
+                    }
                 await send(event)
 
             # Apply to anything that isn't GET, HEAD, OPTIONS, TRACE (like Django does)
