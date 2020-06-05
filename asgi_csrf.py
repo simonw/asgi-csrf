@@ -58,18 +58,31 @@ def asgi_csrf_decorator(
                 if event["type"] == "http.response.start":
                     if should_set_cookie:
                         original_headers = event.get("headers") or []
-                        set_cookie_headers = [
+                        new_headers = []
+                        # Loop through original headers in case we need to modify "vary"
+                        found_vary = False
+                        for key, value in original_headers:
+                            if key == b"vary":
+                                found_vary = True
+                                vary_bits = [v.strip() for v in value.split(b",")]
+                                if b"Cookie" not in vary_bits:
+                                    vary_bits.append(b"Cookie")
+                                value = b", ".join(vary_bits)
+                            new_headers.append((key, value))
+                        if not found_vary:
+                            new_headers.append((b"vary", b"Cookie"))
+                        new_headers.append(
                             (
                                 b"set-cookie",
                                 "{}={}; Path=/".format(cookie_name, csrftoken).encode(
                                     "utf-8"
                                 ),
                             )
-                        ]
+                        )
                         event = {
                             "type": "http.response.start",
                             "status": event["status"],
-                            "headers": original_headers + set_cookie_headers,
+                            "headers": new_headers,
                         }
                 await send(event)
 

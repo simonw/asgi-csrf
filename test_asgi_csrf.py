@@ -16,7 +16,10 @@ async def hello_world(request):
     if request.method == "POST":
         data = await request.form()
         return JSONResponse(dict(await request.form()))
-    return JSONResponse({"hello": "world"})
+    headers = {}
+    if "_vary" in request.query_params:
+        headers["Vary"] = request.query_params["_vary"]
+    return JSONResponse({"hello": "world"}, headers=headers)
 
 
 async def hello_world_static(request):
@@ -55,6 +58,17 @@ async def test_asgi_csrf_sets_cookie(app_csrf):
     assert b'{"hello":"world"}' == response.content
     assert "csrftoken" in response.cookies
     assert response.headers["set-cookie"].endswith("; Path=/")
+    assert "Cookie" == response.headers["vary"]
+
+
+@pytest.mark.asyncio
+async def test_asgi_csrf_modifies_existing_vary_header(app_csrf):
+    async with httpx.AsyncClient(app=app_csrf) as client:
+        response = await client.get("http://localhost/?_vary=User-Agent")
+    assert b'{"hello":"world"}' == response.content
+    assert "csrftoken" in response.cookies
+    assert response.headers["set-cookie"].endswith("; Path=/")
+    assert "User-Agent, Cookie" == response.headers["vary"]
 
 
 @pytest.mark.asyncio

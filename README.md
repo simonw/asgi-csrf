@@ -41,6 +41,8 @@ Your application code should include that value as a hidden form field in any PO
 
 Note that `request.scope["csrftoken"]` is a function that returns a string. Calling that function also lets the middleware know that the cookie should be set by that page, if the user does not already have that cookie.
 
+If the cookie needs to be set, the middleware will add a `Vary: Cookie` header to the response to ensure it is not incorrectly cached by any CDNs or intermediary proxies.
+
 The middleware will return a 403 forbidden error for any POST requests that do not include the matching `csrftoken` - either in the POST data or in a `x-csrftoken` HTTP header (useful for JavaScript `fetch()` calls).
 
 The `signing_secret` is used to sign the tokens, to protect against subdomain vulnerabilities.
