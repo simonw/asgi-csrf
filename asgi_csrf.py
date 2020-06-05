@@ -33,21 +33,26 @@ def asgi_csrf_decorator(
         async def app_wrapped_with_csrf(scope, receive, send):
             cookies = cookies_from_scope(scope)
             csrftoken = None
+            has_csrftoken_cookie = False
             should_set_cookie = False
-            should_set_cookie = True
             if cookie_name in cookies:
                 try:
                     csrftoken = cookies.get(cookie_name, "")
                     signer.loads(csrftoken, signing_namespace)
                 except BadSignature:
                     csrftoken = ""
-                    should_set_cookie = True
                 else:
-                    should_set_cookie = False
-            if should_set_cookie:
-                # We are going to set that cookie
+                    has_csrftoken_cookie = True
+            if not has_csrftoken_cookie:
                 csrftoken = signer.dumps(make_secret(16), signing_namespace)
-            scope = {**scope, **{SCOPE_KEY: csrftoken}}
+
+            def get_csrftoken():
+                nonlocal should_set_cookie
+                if not has_csrftoken_cookie:
+                    should_set_cookie = True
+                return csrftoken
+
+            scope = {**scope, **{SCOPE_KEY: get_csrftoken}}
 
             async def wrapped_send(event):
                 if event["type"] == "http.response.start":

@@ -11,13 +11,24 @@ SECRET = "secret"
 
 
 async def hello_world(request):
+    if "csrftoken" in request.scope:
+        print(request.scope["csrftoken"]())
     if request.method == "POST":
         data = await request.form()
         return JSONResponse(dict(await request.form()))
     return JSONResponse({"hello": "world"})
 
 
-hello_world_app = Starlette(routes=[Route("/", hello_world, methods=["GET", "POST"]),])
+async def hello_world_static(request):
+    return JSONResponse({"hello": "world", "static": True})
+
+
+hello_world_app = Starlette(
+    routes=[
+        Route("/", hello_world, methods=["GET", "POST"]),
+        Route("/static", hello_world_static, methods=["GET"]),
+    ]
+)
 
 
 @pytest.fixture
@@ -44,6 +55,14 @@ async def test_asgi_csrf_sets_cookie(app_csrf):
     assert b'{"hello":"world"}' == response.content
     assert "csrftoken" in response.cookies
     assert response.headers["set-cookie"].endswith("; Path=/")
+
+
+@pytest.mark.asyncio
+async def test_asgi_csrf_sets_no_cookie_if_page_has_no_form(app_csrf):
+    async with httpx.AsyncClient(app=app_csrf) as client:
+        response = await client.get("http://localhost/static")
+    assert b'{"hello":"world","static":true}' == response.content
+    assert "csrftoken" not in response.cookies
 
 
 @pytest.mark.asyncio

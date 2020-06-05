@@ -28,16 +28,18 @@ from .my_asgi_app import app
 app = asgi_csrf(app, signing_secret="secret-goes-here")
 ```
 
-The middleware will set a `csrftoken` cookie, if one is missing. The value of that token will be made available as `scope["csrftoken]` to your ASGI application.
+The middleware will set a `csrftoken` cookie, if one is missing. The value of that token will be made available to your ASGI application through the `scope["csrftoken"]` function.
 
 Your application code should include that value as a hidden form field in any POST forms:
 
 ```html
 <form action="/login" method="POST">
     ...
-    <input type="hidden" name="csrftoken" value="{{ request.scope.csrftoken }}">
+    <input type="hidden" name="csrftoken" value="{{ request.scope.csrftoken() }}">
 </form>
 ```
+
+Note that `request.scope["csrftoken"]` is a function that returns a string. Calling that function also lets the middleware know that the cookie should be set by that page, if the user does not already have that cookie.
 
 The middleware will return a 403 forbidden error for any POST requests that do not include the matching `csrftoken` - either in the POST data or in a `x-csrftoken` HTTP header (useful for JavaScript `fetch()` calls).
 
