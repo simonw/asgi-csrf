@@ -43,6 +43,7 @@ async def test_asgi_csrf_sets_cookie(app_csrf):
         response = await client.get("http://localhost/")
     assert b'{"hello":"world"}' == response.content
     assert "csrftoken" in response.cookies
+    assert response.headers["set-cookie"].endswith("; Path=/")
 
 
 @pytest.mark.asyncio

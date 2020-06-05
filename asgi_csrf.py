@@ -56,7 +56,9 @@ def asgi_csrf_decorator(
                         set_cookie_headers = [
                             (
                                 b"set-cookie",
-                                "{}={}".format(cookie_name, csrftoken).encode("utf-8"),
+                                "{}={}; Path=/".format(cookie_name, csrftoken).encode(
+                                    "utf-8"
+                                ),
                             )
                         ]
                         event = {
