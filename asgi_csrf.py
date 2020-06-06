@@ -35,7 +35,7 @@ def asgi_csrf_decorator(
             csrftoken = None
             has_csrftoken_cookie = False
             should_set_cookie = False
-            page_needs_vary_cookie = False
+            page_needs_vary_header = False
             if cookie_name in cookies:
                 try:
                     csrftoken = cookies.get(cookie_name, "")
@@ -49,8 +49,8 @@ def asgi_csrf_decorator(
 
             def get_csrftoken():
                 nonlocal should_set_cookie
-                nonlocal page_needs_vary_cookie
-                page_needs_vary_cookie = True
+                nonlocal page_needs_vary_header
+                page_needs_vary_header = True
                 if not has_csrftoken_cookie:
                     should_set_cookie = True
                 return csrftoken
@@ -61,7 +61,7 @@ def asgi_csrf_decorator(
                 if event["type"] == "http.response.start":
                     original_headers = event.get("headers") or []
                     new_headers = []
-                    if page_needs_vary_cookie:
+                    if page_needs_vary_header:
                         # Loop through original headers, modify or add "vary"
                         found_vary = False
                         for key, value in original_headers:
