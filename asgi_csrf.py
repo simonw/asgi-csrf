@@ -74,6 +74,8 @@ def asgi_csrf_decorator(
                             new_headers.append((key, value))
                         if not found_vary:
                             new_headers.append((b"vary", b"Cookie"))
+                    else:
+                        new_headers = original_headers
                     if should_set_cookie:
                         new_headers.append(
                             (

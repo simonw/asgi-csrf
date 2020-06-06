@@ -100,6 +100,13 @@ async def test_vary_header_only_if_page_contains_csrftoken(app_csrf, csrftoken):
 
 
 @pytest.mark.asyncio
+async def test_headers_passed_through_correctly(app_csrf):
+    async with httpx.AsyncClient(app=app_csrf) as client:
+        response = await client.get("http://localhost/static")
+        assert "application/json" == response.headers["content-type"]
+
+
+@pytest.mark.asyncio
 async def test_asgi_csrf_does_not_set_cookie_if_one_sent(app_csrf, csrftoken):
     async with httpx.AsyncClient(app=app_csrf) as client:
         response = await client.get(
