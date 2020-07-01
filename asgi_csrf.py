@@ -105,6 +105,14 @@ def asgi_csrf_decorator(
                     # x-csrftoken header matches
                     await app(scope, receive, wrapped_send)
                     return
+                # Authorization: Bearer skips CSRF check
+                if (
+                    headers.get(b"authorization", b"")
+                    .decode("latin-1")
+                    .startswith("Bearer ")
+                ):
+                    await app(scope, receive, wrapped_send)
+                    return
                 # We need to look for it in the POST body
                 content_type = headers.get(b"content-type", b"").split(b";", 1)[0]
                 if content_type == b"application/x-www-form-urlencoded":

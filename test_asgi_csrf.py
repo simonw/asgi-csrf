@@ -167,3 +167,17 @@ async def test_multipart_not_supported(csrftoken):
                 files={"csv": ("data.csv", "blah,foo\n1,2", "text/csv")},
                 cookies={"csrftoken": csrftoken},
             )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "authorization,expected_status", [("Bearer xxx", 200), ("Basic xxx", 403)]
+)
+async def test_post_with_authorization(authorization, expected_status):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(hello_world_app, signing_secret=SECRET)
+    ) as client:
+        response = await client.post(
+            "http://localhost/", headers={"Authorization": authorization}
+        )
+        assert expected_status == response.status_code

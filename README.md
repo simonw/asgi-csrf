@@ -53,6 +53,10 @@ If it cannot find that environment variable, it will generate a random secret wh
 
 This means that if you do not configure a specific secret your user's `csrftoken` cookies will become invalid every time the server restarts! You should configure a secret.
 
+## Other cases that skip CSRF protection
+
+* If the request includes an `Authorization: Bearer ...` header, commonly used by OAuth and JWT authentication, the request will not be required to include a CSRF token. This is because browsers cannot send those headers in a context that can be abused.
+
 ## Limitations
 
 * Currently only works for `application/x-www-form-urlencoded` forms, not `multipart/form-data` forms (with file uploads)
