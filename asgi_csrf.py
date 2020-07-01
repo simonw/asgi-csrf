@@ -21,6 +21,7 @@ def asgi_csrf_decorator(
     form_input=DEFAULT_FORM_INPUT,
     signing_secret=None,
     signing_namespace=DEFAULT_SIGNING_NAMESPACE,
+    always_protect=None,
 ):
     if signing_secret is None:
         signing_secret = os.environ.get(ENV_SECRET, None)
@@ -105,6 +106,11 @@ def asgi_csrf_decorator(
                     # x-csrftoken header matches
                     await app(scope, receive, wrapped_send)
                     return
+                # If no cookies, skip check UNLESS path is in always_protect
+                if not headers.get(b"cookie"):
+                    if always_protect is None or scope["path"] not in always_protect:
+                        await app(scope, receive, wrapped_send)
+                        return
                 # Authorization: Bearer skips CSRF check
                 if (
                     headers.get(b"authorization", b"")
@@ -181,12 +187,14 @@ def asgi_csrf(
     http_header=DEFAULT_HTTP_HEADER,
     signing_secret=None,
     signing_namespace=DEFAULT_SIGNING_NAMESPACE,
+    always_protect=None,
 ):
     return asgi_csrf_decorator(
         cookie_name,
         http_header,
         signing_secret=signing_secret,
         signing_namespace=signing_namespace,
+        always_protect=always_protect,
     )(app)
 
 

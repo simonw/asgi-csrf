@@ -55,7 +55,19 @@ This means that if you do not configure a specific secret your user's `csrftoken
 
 ## Other cases that skip CSRF protection
 
-* If the request includes an `Authorization: Bearer ...` header, commonly used by OAuth and JWT authentication, the request will not be required to include a CSRF token. This is because browsers cannot send those headers in a context that can be abused.
+If the request includes an `Authorization: Bearer ...` header, commonly used by OAuth and JWT authentication, the request will not be required to include a CSRF token. This is because browsers cannot send those headers in a context that can be abused.
+
+If the request has no cookies at all it will be allowed through, since CSRF protection is only necessary for requests from authenticated users.
+
+If you have paths that should always be protected even without cookies - your login form for example (to avoid [login CSRF](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#login-csrf) attacks) you can protect those paths by passing them as the ``always_protect`` parameter:
+
+```python
+app = asgi_csrf(
+    app,
+    signing_secret="secret-goes-here",
+    always_protect={"/login"}
+)
+```
 
 ## Limitations
 

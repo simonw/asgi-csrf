@@ -117,13 +117,6 @@ async def test_asgi_csrf_does_not_set_cookie_if_one_sent(app_csrf, csrftoken):
 
 
 @pytest.mark.asyncio
-async def test_prevents_post_if_no_cookie(app_csrf):
-    async with httpx.AsyncClient(app=app_csrf) as client:
-        response = await client.post("http://localhost/")
-    assert 403 == response.status_code
-
-
-@pytest.mark.asyncio
 async def test_prevents_post_if_cookie_not_sent_in_post(app_csrf, csrftoken):
     async with httpx.AsyncClient(app=app_csrf) as client:
         response = await client.post(
@@ -178,6 +171,28 @@ async def test_post_with_authorization(authorization, expected_status):
         app=asgi_csrf(hello_world_app, signing_secret=SECRET)
     ) as client:
         response = await client.post(
-            "http://localhost/", headers={"Authorization": authorization}
+            "http://localhost/",
+            headers={"Authorization": authorization},
+            cookies={"foo": "bar"},
         )
+        assert expected_status == response.status_code
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "cookies,path,expected_status",
+    [
+        ({}, "/", 200),
+        ({"foo": "bar"}, "/", 403),
+        ({}, "/login", 403),
+        ({"foo": "bar"}, "/login", 403),
+    ],
+)
+async def test_no_cookies_skips_check_unless_path_required(
+    cookies, path, expected_status
+):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(hello_world_app, signing_secret=SECRET, always_protect={"/login"})
+    ) as client:
+        response = await client.post("http://localhost{}".format(path), cookies=cookies)
         assert expected_status == response.status_code
