@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/asgi-csrf.svg)](https://pypi.org/project/asgi-csrf/)
 [![CircleCI](https://circleci.com/gh/simonw/asgi-csrf.svg?style=svg)](https://circleci.com/gh/simonw/asgi-csrf)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/simonw/asgi-csrf/blob/master/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/simonw/asgi-csrf/blob/main/LICENSE)
 
 ASGI middleware for protecting against CSRF attacks
 
