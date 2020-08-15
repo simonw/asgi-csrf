@@ -5,6 +5,7 @@ from asgi_csrf import asgi_csrf
 from itsdangerous.url_safe import URLSafeSerializer
 import httpx
 import json
+import os
 import pytest
 
 SECRET = "secret"
@@ -52,6 +53,16 @@ async def test_hello_world_app():
     async with httpx.AsyncClient(app=hello_world_app) as client:
         response = await client.get("http://localhost/")
     assert b'{"hello":"world"}' == response.content
+
+
+def test_signing_secret_if_none_provided(monkeypatch):
+    app = asgi_csrf(hello_world_app)
+    # Should be randomly generated
+    assert isinstance(app.__closure__[5].cell_contents.secret_key, bytes)
+    # Should pick up `ASGI_CSRF_SECRET` if available
+    monkeypatch.setenv("ASGI_CSRF_SECRET", "secret-from-environment")
+    app2 = asgi_csrf(hello_world_app)
+    assert app2.__closure__[5].cell_contents.secret_key == b"secret-from-environment"
 
 
 @pytest.mark.asyncio
