@@ -26,5 +26,4 @@ jobs:
         pip install -e '.[test]'
     - name: Run tests
       run: |
-        pytest
-
+        pytest --cov-fail-under=100 --cov asgi_csrf
