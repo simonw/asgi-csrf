@@ -29,5 +29,6 @@ jobs:
         pytest --cov-fail-under=100 --cov asgi_csrf
     - name: Upload coverage to codecov.io
       run: bash <(curl -s https://codecov.io/bash)
+      if: always()
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
