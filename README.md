@@ -68,7 +68,3 @@ app = asgi_csrf(
     always_protect={"/login"}
 )
 ```
-
-## Limitations
-
-* Currently only works for `application/x-www-form-urlencoded` forms, not `multipart/form-data` forms (with file uploads)
