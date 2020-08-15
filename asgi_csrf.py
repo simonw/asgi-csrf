@@ -131,7 +131,9 @@ def asgi_csrf_decorator(
                         return
                     else:
                         await send_csrf_failed(
-                            scope, wrapped_send, "form-urlencoded POST field did not match cookie"
+                            scope,
+                            wrapped_send,
+                            "form-urlencoded POST field did not match cookie",
                         )
                         return
                 elif content_type == b"multipart/form-data":
@@ -147,16 +149,15 @@ def asgi_csrf_decorator(
                             csrftoken_from_body,
                             replay_receive,
                         ) = await _parse_multipart_form_data(boundary, receive)
-                        if not secrets.compare_digest(csrftoken_from_body, csrftoken):
+                        if not secrets.compare_digest(
+                            csrftoken_from_body or "", csrftoken
+                        ):
                             await send_csrf_failed(
-                                scope, wrapped_send, "multipart/form-data POST field did not match cookie"
+                                scope,
+                                wrapped_send,
+                                "multipart/form-data POST field did not match cookie",
                             )
                             return
-                    except NoToken:
-                        await send_csrf_failed(
-                            scope, wrapped_send, "csrftoken not found in body"
-                        )
-                        return
                     except FileBeforeToken:
                         await send_csrf_failed(
                             scope,

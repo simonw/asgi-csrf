@@ -143,11 +143,12 @@ async def test_prevents_post_if_cookie_not_sent_in_post(app_csrf, csrftoken):
 async def test_prevents_post_if_cookie_not_sent_in_post(app_csrf, csrftoken):
     async with httpx.AsyncClient(app=app_csrf) as client:
         response = await client.post(
-            "http://localhost/", cookies={"csrftoken": csrftoken},
+            "http://localhost/",
+            cookies={"csrftoken": csrftoken},
             data={"csrftoken": csrftoken[-1]},
         )
     assert 403 == response.status_code
-    assert response.text == 'form-urlencoded POST field did not match cookie'
+    assert response.text == "form-urlencoded POST field did not match cookie"
 
 
 @pytest.mark.asyncio
@@ -191,7 +192,7 @@ async def test_multipart(csrftoken):
 
 
 @pytest.mark.asyncio
-async def test_multipart_failure(csrftoken):
+async def test_multipart_failure_wrong_token(csrftoken):
     async with httpx.AsyncClient(
         app=asgi_csrf(hello_world_app, signing_secret=SECRET)
     ) as client:
@@ -200,6 +201,27 @@ async def test_multipart_failure(csrftoken):
             data={"csrftoken": csrftoken},
             files={"csv": ("data.csv", "blah,foo\n1,2", "text/csv")},
             cookies={"csrftoken": csrftoken[:-1]},
+        )
+        assert response.status_code == 403
+        assert response.text == "multipart/form-data POST field did not match cookie"
+
+
+class TrickEmptyDictionary(dict):
+    # https://github.com/simonw/asgi-csrf/pull/14#issuecomment-674424080
+    def __bool__(self):
+        return True
+
+
+@pytest.mark.asyncio
+async def test_multipart_failure_missing_token(csrftoken):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(hello_world_app, signing_secret=SECRET)
+    ) as client:
+        response = await client.post(
+            "http://localhost/",
+            data={"foo": "bar"},
+            files=TrickEmptyDictionary(),
+            cookies={"csrftoken": csrftoken},
         )
         assert response.status_code == 403
         assert response.text == "multipart/form-data POST field did not match cookie"
