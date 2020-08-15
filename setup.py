@@ -23,5 +23,7 @@ setup(
     version=VERSION,
     py_modules=["asgi_csrf"],
     install_requires=["itsdangerous", "python-multipart"],
-    extras_require={"test": ["pytest", "pytest-asyncio", "httpx", "starlette"]},
+    extras_require={
+        "test": ["pytest", "pytest-asyncio", "httpx", "starlette", "pytest-cov"]
+    },
 )
