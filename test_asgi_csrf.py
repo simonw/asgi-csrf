@@ -12,10 +12,13 @@ SECRET = "secret"
 
 async def hello_world(request):
     if "csrftoken" in request.scope and "_no_token" not in request.query_params:
-        print(request.scope["csrftoken"]())
+        request.scope["csrftoken"]()
     if request.method == "POST":
         data = await request.form()
-        return JSONResponse(dict(await request.form()))
+        data = dict(data)
+        if "csv" in data:
+            data["csv"] = (await data["csv"].read()).decode("utf-8")
+        return JSONResponse(data)
     headers = {}
     if "_vary" in request.query_params:
         headers["Vary"] = request.query_params["_vary"]
@@ -151,15 +154,33 @@ async def test_allows_post_if_cookie_duplicated_in_post_data(csrftoken):
 
 
 @pytest.mark.asyncio
-async def test_multipart_not_supported(csrftoken):
-    async with httpx.AsyncClient(app=asgi_csrf(hello_world_app)) as client:
-        with pytest.raises(AssertionError):
-            response = await client.post(
-                "http://localhost/",
-                data={"csrftoken": csrftoken},
-                files={"csv": ("data.csv", "blah,foo\n1,2", "text/csv")},
-                cookies={"csrftoken": csrftoken},
-            )
+async def test_multipart(csrftoken):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(hello_world_app, signing_secret=SECRET)
+    ) as client:
+        response = await client.post(
+            "http://localhost/",
+            data={"csrftoken": csrftoken},
+            files={"csv": ("data.csv", "blah,foo\n1,2", "text/csv")},
+            cookies={"csrftoken": csrftoken},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"csrftoken": csrftoken, "csv": "blah,foo\n1,2"}
+
+
+@pytest.mark.asyncio
+async def test_multipart_failure(csrftoken):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(hello_world_app, signing_secret=SECRET)
+    ) as client:
+        response = await client.post(
+            "http://localhost/",
+            data={"csrftoken": csrftoken},
+            files={"csv": ("data.csv", "blah,foo\n1,2", "text/csv")},
+            cookies={"csrftoken": csrftoken[:-1]},
+        )
+        assert response.status_code == 403
+        assert response.text == "POST field did not match cookie"
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,7 @@
 from http.cookies import SimpleCookie
 import fnmatch
 from functools import wraps
+from multipart import FormParser
 import os
 from urllib.parse import parse_qsl
 from itsdangerous.url_safe import URLSafeSerializer
@@ -99,9 +100,9 @@ def asgi_csrf_decorator(
             else:
                 # Check for CSRF token in various places
                 headers = dict(scope.get("headers" or []))
-                if (
-                    headers.get(http_header.encode("latin-1"), b"").decode("latin-1")
-                    == csrftoken
+                if secrets.compare_digest(
+                    headers.get(http_header.encode("latin-1"), b"").decode("latin-1"),
+                    csrftoken,
                 ):
                     # x-csrftoken header matches
                     await app(scope, receive, wrapped_send)
@@ -136,7 +137,36 @@ def asgi_csrf_decorator(
                 elif content_type == b"multipart/form-data":
                     # Consume non-file items until we see a csrftoken
                     # If we see a file item first, it's an error
-                    assert False, "multipart/form-data is not yet supported"
+                    boundary = headers.get(b"content-type").split(b"; boundary=")[1]
+                    assert boundary is not None, "missing 'boundary' header: {}".format(
+                        repr(headers)
+                    )
+                    # Consume enough POST body to find the csrftoken, or error if form seen first
+                    try:
+                        (
+                            csrftoken_from_body,
+                            replay_receive,
+                        ) = await _parse_multipart_form_data(boundary, receive)
+                        if not secrets.compare_digest(csrftoken_from_body, csrftoken):
+                            await send_csrf_failed(
+                                scope, wrapped_send, "POST field did not match cookie"
+                            )
+                            return
+                    except NoToken:
+                        await send_csrf_failed(
+                            scope, wrapped_send, "csrftoken not found in body"
+                        )
+                        return
+                    except FileBeforeToken:
+                        await send_csrf_failed(
+                            scope,
+                            wrapped_send,
+                            "File encountered before csrftoken - make sure csrftoken is first in the HTML",
+                        )
+                        return
+                    # Now replay the body
+                    await app(scope, replay_receive, wrapped_send)
+                    return
                 else:
                     await send_csrf_failed(
                         scope, wrapped_send, message="Unknown content-type"
@@ -167,6 +197,64 @@ async def _parse_form_urlencoded(receive):
         return messages.pop(0)
 
     return dict(parse_qsl(body.decode("utf-8"))), replay_receive
+
+
+class NoToken(Exception):
+    pass
+
+
+class TokenFound(Exception):
+    pass
+
+
+class FileBeforeToken(Exception):
+    pass
+
+
+async def _parse_multipart_form_data(boundary, receive):
+    # Returns (csrftoken, replay_receive) - or raises an exception
+    csrftoken = None
+
+    def on_field(field):
+        if field.field_name == b"csrftoken":
+            csrftoken = field.value.decode("utf-8")
+            raise TokenFound(csrftoken)
+
+    class ErrorOnWrite:
+        def __init__(self, file_name, field_name, config):
+            pass
+
+        def write(self, data):
+            raise FileBeforeToken
+
+    body = b""
+    more_body = True
+    messages = []
+
+    async def replay_receive():
+        if messages:
+            return messages.pop(0)
+        else:
+            return await receive()
+
+    form_parser = FormParser(
+        "multipart/form-data",
+        on_field,
+        lambda: None,
+        boundary=boundary,
+        FileClass=ErrorOnWrite,
+    )
+    try:
+        while more_body:
+            message = await receive()
+            assert message["type"] == "http.request", message
+            messages.append(message)
+            form_parser.write(message.get("body", b""))
+            more_body = message.get("more_body", False)
+    except TokenFound as t:
+        return t.args[0], replay_receive
+
+    return None, replay_receive
 
 
 async def send_csrf_failed(scope, send, message="CSRF check failed"):

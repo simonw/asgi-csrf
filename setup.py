@@ -22,8 +22,6 @@ setup(
     license="Apache License, Version 2.0",
     version=VERSION,
     py_modules=["asgi_csrf"],
-    install_requires=["itsdangerous"],
-    extras_require={
-        "test": ["pytest", "pytest-asyncio", "httpx", "starlette", "python-multipart"]
-    },
+    install_requires=["itsdangerous", "python-multipart"],
+    extras_require={"test": ["pytest", "pytest-asyncio", "httpx", "starlette"]},
 )
