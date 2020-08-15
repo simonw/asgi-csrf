@@ -140,6 +140,17 @@ async def test_prevents_post_if_cookie_not_sent_in_post(app_csrf, csrftoken):
 
 
 @pytest.mark.asyncio
+async def test_prevents_post_if_cookie_not_sent_in_post(app_csrf, csrftoken):
+    async with httpx.AsyncClient(app=app_csrf) as client:
+        response = await client.post(
+            "http://localhost/", cookies={"csrftoken": csrftoken},
+            data={"csrftoken": csrftoken[-1]},
+        )
+    assert 403 == response.status_code
+    assert response.text == 'form-urlencoded POST field did not match cookie'
+
+
+@pytest.mark.asyncio
 async def test_allows_post_if_cookie_duplicated_in_header(app_csrf, csrftoken):
     async with httpx.AsyncClient(app=app_csrf) as client:
         response = await client.post(
@@ -191,7 +202,7 @@ async def test_multipart_failure(csrftoken):
             cookies={"csrftoken": csrftoken[:-1]},
         )
         assert response.status_code == 403
-        assert response.text == "POST field did not match cookie"
+        assert response.text == "multipart/form-data POST field did not match cookie"
 
 
 @pytest.mark.asyncio
