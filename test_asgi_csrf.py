@@ -4,6 +4,7 @@ from starlette.routing import Route
 from asgi_csrf import asgi_csrf
 from itsdangerous.url_safe import URLSafeSerializer
 import httpx
+from httpx._content_streams import MultipartStream
 import json
 import os
 import pytest
@@ -225,6 +226,41 @@ async def test_multipart_failure_missing_token(csrftoken):
         )
         assert response.status_code == 403
         assert response.text == "multipart/form-data POST field did not match cookie"
+
+
+class FileFirstMultipartStream(MultipartStream):
+    def _iter_fields(self, data, files):
+        for name, value in files.items():
+            yield self.FileField(name=name, value=value)
+        for name, value in data.items():
+            if isinstance(value, list):
+                for item in value:
+                    yield self.DataField(name=name, value=item)
+            else:
+                yield self.DataField(name=name, value=value)
+
+
+@pytest.mark.asyncio
+async def test_multipart_failure_file_comes_before_token(csrftoken):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(hello_world_app, signing_secret=SECRET)
+    ) as client:
+        request = httpx.Request(
+            url="http://localhost/",
+            method="POST",
+            stream=FileFirstMultipartStream(
+                data={"csrftoken": csrftoken},
+                files={"csv": ("data.csv", "blah,foo\n1,2", "text/csv")},
+                boundary=None,
+            ),
+            cookies={"csrftoken": csrftoken},
+        )
+        response = await client.send(request)
+        assert response.status_code == 403
+        assert (
+            response.text
+            == "File encountered before csrftoken - make sure csrftoken is first in the HTML"
+        )
 
 
 @pytest.mark.asyncio
