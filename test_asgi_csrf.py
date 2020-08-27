@@ -1,3 +1,4 @@
+from asgi_lifespan import LifespanManager
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -297,3 +298,16 @@ async def test_no_cookies_skips_check_unless_path_required(
     ) as client:
         response = await client.post("http://localhost{}".format(path), cookies=cookies)
         assert expected_status == response.status_code
+
+
+@pytest.mark.asyncio
+async def test_asgi_lifespan():
+    app = asgi_csrf(hello_world_app, signing_secret=SECRET)
+    async with LifespanManager(app):
+        async with httpx.AsyncClient(app=app) as client:
+            response = await client.post(
+                "http://localhost/",
+                headers={"Authorization": "Bearer xxx"},
+                cookies={"foo": "bar"},
+            )
+            assert 200 == response.status_code

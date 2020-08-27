@@ -33,6 +33,9 @@ def asgi_csrf_decorator(
     def _asgi_csrf_decorator(app):
         @wraps(app)
         async def app_wrapped_with_csrf(scope, receive, send):
+            if scope["type"] != "http":
+                await app(scope, receive, send)
+                return
             cookies = cookies_from_scope(scope)
             csrftoken = None
             has_csrftoken_cookie = False
