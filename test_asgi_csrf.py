@@ -5,9 +5,7 @@ from starlette.routing import Route
 from asgi_csrf import asgi_csrf
 from itsdangerous.url_safe import URLSafeSerializer
 import httpx
-from httpx._multipart import MultipartStream, FileField, DataField
 import json
-import os
 import pytest
 
 SECRET = "secret"
@@ -229,18 +227,6 @@ async def test_multipart_failure_missing_token(csrftoken):
         assert response.text == "multipart/form-data POST field did not match cookie"
 
 
-class FileFirstMultipartStream(MultipartStream):
-    def _iter_fields(self, data, files):
-        for name, value in files.items():
-            yield FileField(name=name, value=value)
-        for name, value in data.items():
-            if isinstance(value, list):
-                for item in value:
-                    yield DataField(name=name, value=item)
-            else:
-                yield DataField(name=name, value=value)
-
-
 @pytest.mark.asyncio
 async def test_multipart_failure_file_comes_before_token(csrftoken):
     async with httpx.AsyncClient(
@@ -249,10 +235,17 @@ async def test_multipart_failure_file_comes_before_token(csrftoken):
         request = httpx.Request(
             url="http://localhost/",
             method="POST",
-            stream=FileFirstMultipartStream(
-                data={"csrftoken": csrftoken},
-                files={"csv": ("data.csv", "blah,foo\n1,2", "text/csv")},
-                boundary=b"boo",
+            data=(
+                b"--boo\r\n"
+                b'Content-Disposition: form-data; name="csv"; filename="data.csv"'
+                b"\r\nContent-Type: text/csv\r\n\r\n"
+                b"blah,foo\n1,2"
+                b"\r\n"
+                b"--boo\r\n"
+                b'Content-Disposition: form-data; name="csrftoken"\r\n\r\n'
+                + csrftoken.encode("utf-8")
+                + b"\r\n"
+                b"--boo--\r\n"
             ),
             headers={"content-type": "multipart/form-data; boundary=boo"},
             cookies={"csrftoken": csrftoken},
