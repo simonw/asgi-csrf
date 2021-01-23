@@ -5,7 +5,7 @@ from starlette.routing import Route
 from asgi_csrf import asgi_csrf
 from itsdangerous.url_safe import URLSafeSerializer
 import httpx
-from httpx._content_streams import MultipartStream
+from httpx._multipart import MultipartStream, FileField, DataField
 import json
 import os
 import pytest
@@ -232,13 +232,13 @@ async def test_multipart_failure_missing_token(csrftoken):
 class FileFirstMultipartStream(MultipartStream):
     def _iter_fields(self, data, files):
         for name, value in files.items():
-            yield self.FileField(name=name, value=value)
+            yield FileField(name=name, value=value)
         for name, value in data.items():
             if isinstance(value, list):
                 for item in value:
-                    yield self.DataField(name=name, value=item)
+                    yield DataField(name=name, value=item)
             else:
-                yield self.DataField(name=name, value=value)
+                yield DataField(name=name, value=value)
 
 
 @pytest.mark.asyncio
@@ -252,8 +252,9 @@ async def test_multipart_failure_file_comes_before_token(csrftoken):
             stream=FileFirstMultipartStream(
                 data={"csrftoken": csrftoken},
                 files={"csv": ("data.csv", "blah,foo\n1,2", "text/csv")},
-                boundary=None,
+                boundary=b"boo",
             ),
+            headers={"content-type": "multipart/form-data; boundary=boo"},
             cookies={"csrftoken": csrftoken},
         )
         response = await client.send(request)

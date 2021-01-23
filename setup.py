@@ -27,7 +27,7 @@ setup(
         "test": [
             "pytest",
             "pytest-asyncio",
-            "httpx",
+            "httpx>=0.16",
             "starlette",
             "pytest-cov",
             "asgi-lifespan",
