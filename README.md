@@ -40,7 +40,7 @@ Your application code should include that value as a hidden form field in any PO
 </form>
 ```
 
-Note that `request.scope["csrftoken"]` is a function that returns a string. Calling that function also lets the middleware know that the cookie should be set by that page, if the user does not already have that cookie.
+Note that `request.scope["csrftoken"]()` is a function that returns a string. Calling that function also lets the middleware know that the cookie should be set by that page, if the user does not already have that cookie.
 
 If the cookie needs to be set, the middleware will add a `Vary: Cookie` header to the response to ensure it is not incorrectly cached by any CDNs or intermediary proxies.
 
@@ -53,6 +53,16 @@ If you do not pass in an explicit `signing_secret` parameter, the middleware wil
 If it cannot find that environment variable, it will generate a random secret which will persist for the lifetime of the server.
 
 This means that if you do not configure a specific secret your user's `csrftoken` cookies will become invalid every time the server restarts! You should configure a secret.
+
+## Always setting the cookie if it is not already set
+
+By default this middleware only sets the `csrftoken` cookie if the user encounters a page that needs it - due to that page calling the `request.scope["csrftoken"]()` function, for example to populate a hidden field in a form.
+
+If you would like the middleware to set that cookie for any incoming request that does not already provide the cookie, you can use the `always_set_cookie=True` argument:
+
+```python
+app = asgi_csrf(app, signing_secret="secret-goes-here", always_set_cookie=True)
+```
 
 ## Other cases that skip CSRF protection
 

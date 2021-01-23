@@ -58,11 +58,11 @@ async def test_hello_world_app():
 def test_signing_secret_if_none_provided(monkeypatch):
     app = asgi_csrf(hello_world_app)
     # Should be randomly generated
-    assert isinstance(app.__closure__[5].cell_contents.secret_key, bytes)
+    assert isinstance(app.__closure__[6].cell_contents.secret_key, bytes)
     # Should pick up `ASGI_CSRF_SECRET` if available
     monkeypatch.setenv("ASGI_CSRF_SECRET", "secret-from-environment")
     app2 = asgi_csrf(hello_world_app)
-    assert app2.__closure__[5].cell_contents.secret_key == b"secret-from-environment"
+    assert app2.__closure__[6].cell_contents.secret_key == b"secret-from-environment"
 
 
 @pytest.mark.asyncio
@@ -292,6 +292,39 @@ async def test_no_cookies_skips_check_unless_path_required(
     ) as client:
         response = await client.post("http://localhost{}".format(path), cookies=cookies)
         assert expected_status == response.status_code
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("always_set_cookie", [True, False])
+async def test_always_set_cookie(always_set_cookie):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(
+            hello_world_app, signing_secret=SECRET, always_set_cookie=always_set_cookie
+        )
+    ) as client:
+        response = await client.get("http://localhost/static")
+        assert 200 == response.status_code
+        if always_set_cookie:
+            assert "csrftoken" in response.cookies
+        else:
+            assert "csrftoken" not in response.cookies
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("send_csrftoken_cookie", [True, False])
+async def test_always_set_cookie_unless_cookie_is_set(send_csrftoken_cookie, csrftoken):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(hello_world_app, signing_secret=SECRET, always_set_cookie=True)
+    ) as client:
+        cookies = {}
+        if send_csrftoken_cookie:
+            cookies["csrftoken"] = csrftoken
+        response = await client.get("http://localhost/static", cookies=cookies)
+        assert 200 == response.status_code
+        if send_csrftoken_cookie:
+            assert "csrftoken" not in response.cookies
+        else:
+            assert "csrftoken" in response.cookies
 
 
 @pytest.mark.asyncio

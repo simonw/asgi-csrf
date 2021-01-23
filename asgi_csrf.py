@@ -23,6 +23,7 @@ def asgi_csrf_decorator(
     signing_secret=None,
     signing_namespace=DEFAULT_SIGNING_NAMESPACE,
     always_protect=None,
+    always_set_cookie=False,
 ):
     if signing_secret is None:
         signing_secret = os.environ.get(ENV_SECRET, None)
@@ -49,6 +50,10 @@ def asgi_csrf_decorator(
                     csrftoken = ""
                 else:
                     has_csrftoken_cookie = True
+            else:
+                if always_set_cookie:
+                    should_set_cookie = True
+
             if not has_csrftoken_cookie:
                 csrftoken = signer.dumps(make_secret(16), signing_namespace)
 
@@ -280,6 +285,7 @@ def asgi_csrf(
     signing_secret=None,
     signing_namespace=DEFAULT_SIGNING_NAMESPACE,
     always_protect=None,
+    always_set_cookie=False,
 ):
     return asgi_csrf_decorator(
         cookie_name,
@@ -287,6 +293,7 @@ def asgi_csrf(
         signing_secret=signing_secret,
         signing_namespace=signing_namespace,
         always_protect=always_protect,
+        always_set_cookie=always_set_cookie,
     )(app)
 
 
