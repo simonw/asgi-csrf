@@ -70,6 +70,8 @@ If the request includes an `Authorization: Bearer ...` header, commonly used by 
 
 If the request has no cookies at all it will be allowed through, since CSRF protection is only necessary for requests from authenticated users.
 
+### always_protect
+
 If you have paths that should always be protected even without cookies - your login form for example (to avoid [login CSRF](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#login-csrf) attacks) you can protect those paths by passing them as the ``always_protect`` parameter:
 
 ```python
@@ -77,5 +79,24 @@ app = asgi_csrf(
     app,
     signing_secret="secret-goes-here",
     always_protect={"/login"}
+)
+```
+
+### skip_if_scope
+
+There may be situations in which you want to opt-out of CSRF protection even for authenticated POST requests - this is often the case for web APIs for example.
+
+The `skip_if_scope=` parameter can be used to provide a callback function which is passed an ASGI scope and returns `True` if CSRF protection should be skipped for that request.
+
+This example skips CSRF protection for any incoming request where the request path starts with `/api/`:
+
+```python
+def skip_api_paths(scope)
+    return scope["path"].startswith("/api/")
+
+app = asgi_csrf(
+    app,
+    signing_secret="secret-goes-here",
+    skip_if_scope=skip_api_paths
 )
 ```

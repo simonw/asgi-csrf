@@ -34,6 +34,8 @@ hello_world_app = Starlette(
     routes=[
         Route("/", hello_world, methods=["GET", "POST"]),
         Route("/static", hello_world_static, methods=["GET"]),
+        Route("/api/", hello_world_static, methods=["POST"]),
+        Route("/api/foo", hello_world_static, methods=["POST"]),
     ]
 )
 
@@ -289,6 +291,30 @@ async def test_no_cookies_skips_check_unless_path_required(
 ):
     async with httpx.AsyncClient(
         app=asgi_csrf(hello_world_app, signing_secret=SECRET, always_protect={"/login"})
+    ) as client:
+        response = await client.post("http://localhost{}".format(path), cookies=cookies)
+        assert expected_status == response.status_code
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "cookies,path,expected_status",
+    [
+        ({}, "/", 200),
+        ({"foo": "bar"}, "/", 403),
+        ({}, "/api/", 200),
+        ({"foo": "bar"}, "/api/", 200),
+        ({}, "/api/foo", 200),
+        ({"foo": "bar"}, "/api/foo", 200),
+    ],
+)
+async def test_skip_if_scope(cookies, path, expected_status):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(
+            hello_world_app,
+            signing_secret=SECRET,
+            skip_if_scope=lambda scope: scope["path"].startswith("/api/"),
+        )
     ) as client:
         response = await client.post("http://localhost{}".format(path), cookies=cookies)
         assert expected_status == response.status_code
