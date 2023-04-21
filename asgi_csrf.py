@@ -9,6 +9,10 @@ from itsdangerous import BadSignature
 import secrets
 
 DEFAULT_COOKIE_NAME = "csrftoken"
+DEFAULT_COOKIE_PATH = "/"
+DEFAULT_COOKIE_DOMAIN = None
+DEFAULT_COOKIE_SECURE = False
+DEFAULT_COOKIE_SAMESITE = "Lax"
 DEFAULT_FORM_INPUT = "csrftoken"
 DEFAULT_HTTP_HEADER = "x-csrftoken"
 DEFAULT_SIGNING_NAMESPACE = "csrftoken"
@@ -25,6 +29,10 @@ def asgi_csrf_decorator(
     always_protect=None,
     always_set_cookie=False,
     skip_if_scope=None,
+    cookie_path=DEFAULT_COOKIE_PATH,
+    cookie_domain=DEFAULT_COOKIE_DOMAIN,
+    cookie_secure=DEFAULT_COOKIE_SECURE,
+    cookie_samesite=DEFAULT_COOKIE_SAMESITE,
 ):
     if signing_secret is None:
         signing_secret = os.environ.get(ENV_SECRET, None)
@@ -88,10 +96,22 @@ def asgi_csrf_decorator(
                     else:
                         new_headers = original_headers
                     if should_set_cookie:
+                        cookie_attrs = [
+                            "{}={}".format(cookie_name, csrftoken),
+                            "Path={}".format(cookie_path),
+                            "SameSite={}".format(cookie_samesite)
+                        ]
+
+                        if cookie_domain is not None:
+                            cookie_attrs.append("Domain={}".format(cookie_domain))
+
+                        if cookie_secure:
+                            cookie_attrs.append("Secure")
+
                         new_headers.append(
                             (
                                 b"set-cookie",
-                                "{}={}; Path=/".format(cookie_name, csrftoken).encode(
+                                "; ".join(cookie_attrs).encode(
                                     "utf-8"
                                 ),
                             )
