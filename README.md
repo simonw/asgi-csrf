@@ -64,6 +64,28 @@ If you would like the middleware to set that cookie for any incoming request tha
 app = asgi_csrf(app, signing_secret="secret-goes-here", always_set_cookie=True)
 ```
 
+## Configuring the cookie
+
+The middleware can be configured with several options to control how the CSRF cookie is set:
+
+```python
+app = asgi_csrf(
+    app,
+    signing_secret="secret-goes-here",
+    cookie_name="csrftoken",
+    cookie_path="/",
+    cookie_domain=None,
+    cookie_secure=False,
+    cookie_samesite="Lax"
+)
+```
+
+- `cookie_name`: The name of the cookie to set. Defaults to `"csrftoken"`.
+- `cookie_path`: The path for which the cookie is valid. Defaults to `"/"`, meaning the cookie is valid for the entire domain.
+- `cookie_domain`: The domain for which the cookie is valid. Defaults to `None`, which means the cookie will only be valid for the current domain.
+- `cookie_secure`: If set to `True`, the cookie will only be sent over HTTPS connections. Defaults to `False`.
+- `cookie_samesite`: Controls how the cookie is sent with cross-site requests. Can be set to `"Strict"`, `"Lax"`, or `"None"`. Defaults to `"Lax"`.
+
 ## Other cases that skip CSRF protection
 
 If the request includes an `Authorization: Bearer ...` header, commonly used by OAuth and JWT authentication, the request will not be required to include a CSRF token. This is because browsers cannot send those headers in a context that can be abused.
@@ -101,7 +123,7 @@ app = asgi_csrf(
 )
 ```
 
-### send_csrf_failed
+## Custom errors with send_csrf_failed
 
 By default, when a CSRF token is missing or invalid, the middleware will return a 403 Forbidden response page with a short error message.
 

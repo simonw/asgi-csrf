@@ -10,6 +10,10 @@ from itsdangerous import BadSignature
 import secrets
 
 DEFAULT_COOKIE_NAME = "csrftoken"
+DEFAULT_COOKIE_PATH = "/"
+DEFAULT_COOKIE_DOMAIN = None
+DEFAULT_COOKIE_SECURE = False
+DEFAULT_COOKIE_SAMESITE = "Lax"
 DEFAULT_FORM_INPUT = "csrftoken"
 DEFAULT_HTTP_HEADER = "x-csrftoken"
 DEFAULT_SIGNING_NAMESPACE = "csrftoken"
@@ -41,6 +45,10 @@ def asgi_csrf_decorator(
     always_protect=None,
     always_set_cookie=False,
     skip_if_scope=None,
+    cookie_path=DEFAULT_COOKIE_PATH,
+    cookie_domain=DEFAULT_COOKIE_DOMAIN,
+    cookie_secure=DEFAULT_COOKIE_SECURE,
+    cookie_samesite=DEFAULT_COOKIE_SAMESITE,
     send_csrf_failed=None,
 ):
     send_csrf_failed = send_csrf_failed or default_send_csrf_failed
@@ -106,12 +114,22 @@ def asgi_csrf_decorator(
                     else:
                         new_headers = original_headers
                     if should_set_cookie:
+                        cookie_attrs = [
+                            "{}={}".format(cookie_name, csrftoken),
+                            "Path={}".format(cookie_path),
+                            "SameSite={}".format(cookie_samesite),
+                        ]
+
+                        if cookie_domain is not None:
+                            cookie_attrs.append("Domain={}".format(cookie_domain))
+
+                        if cookie_secure:
+                            cookie_attrs.append("Secure")
+
                         new_headers.append(
                             (
                                 b"set-cookie",
-                                "{}={}; Path=/".format(cookie_name, csrftoken).encode(
-                                    "utf-8"
-                                ),
+                                "; ".join(cookie_attrs).encode("utf-8"),
                             )
                         )
                     event = {
@@ -309,6 +327,10 @@ def asgi_csrf(
     always_protect=None,
     always_set_cookie=False,
     skip_if_scope=None,
+    cookie_path=DEFAULT_COOKIE_PATH,
+    cookie_domain=DEFAULT_COOKIE_DOMAIN,
+    cookie_secure=DEFAULT_COOKIE_SECURE,
+    cookie_samesite=DEFAULT_COOKIE_SAMESITE,
     send_csrf_failed=None,
 ):
     return asgi_csrf_decorator(
@@ -319,6 +341,10 @@ def asgi_csrf(
         always_protect=always_protect,
         always_set_cookie=always_set_cookie,
         skip_if_scope=skip_if_scope,
+        cookie_path=cookie_path,
+        cookie_domain=cookie_domain,
+        cookie_secure=cookie_secure,
+        cookie_samesite=cookie_samesite,
         send_csrf_failed=send_csrf_failed,
     )(app)
 
