@@ -440,3 +440,80 @@ async def test_asgi_lifespan():
                 cookies={"foo": "bar"},
             )
             assert 200 == response.status_code
+
+
+# Tests for different cookie options
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cookie_name", ["csrftoken", "custom_csrf"])
+async def test_cookie_name(cookie_name):
+    wrapped_app = asgi_csrf(
+        hello_world_app, signing_secret="secret", cookie_name=cookie_name
+    )
+    async with httpx.AsyncClient(app=wrapped_app) as client:
+        response = await client.get("http://testserver/")
+    assert cookie_name in response.cookies
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cookie_path", ["/", "/custom"])
+async def test_cookie_path(cookie_path):
+    wrapped_app = asgi_csrf(
+        hello_world_app, signing_secret="secret", cookie_path=cookie_path
+    )
+    async with httpx.AsyncClient(app=wrapped_app) as client:
+        response = await client.get("http://testserver/")
+    assert f"Path={cookie_path}" in response.headers["set-cookie"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cookie_domain", [None, "example.com"])
+async def test_cookie_domain(cookie_domain):
+    wrapped_app = asgi_csrf(
+        hello_world_app, signing_secret="secret", cookie_domain=cookie_domain
+    )
+    async with httpx.AsyncClient(app=wrapped_app) as client:
+        response = await client.get("http://testserver/")
+    if cookie_domain:
+        assert f"Domain={cookie_domain}" in response.headers["set-cookie"]
+    else:
+        assert "Domain" not in response.headers["set-cookie"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cookie_secure", [True, False])
+async def test_cookie_secure(cookie_secure):
+    wrapped_app = asgi_csrf(
+        hello_world_app, signing_secret="secret", cookie_secure=cookie_secure
+    )
+    async with httpx.AsyncClient(app=wrapped_app) as client:
+        response = await client.get("http://testserver/")
+    if cookie_secure:
+        assert "Secure" in response.headers["set-cookie"]
+    else:
+        assert "Secure" not in response.headers["set-cookie"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cookie_samesite", ["Strict", "Lax", "None"])
+async def test_cookie_samesite(cookie_samesite):
+    wrapped_app = asgi_csrf(
+        hello_world_app, signing_secret="secret", cookie_samesite=cookie_samesite
+    )
+    async with httpx.AsyncClient(app=wrapped_app) as client:
+        response = await client.get("http://testserver/")
+    assert f"SameSite={cookie_samesite}" in response.headers["set-cookie"]
+
+
+@pytest.mark.asyncio
+async def test_default_cookie_options():
+    wrapped_app = asgi_csrf(hello_world_app, signing_secret="secret")
+    async with httpx.AsyncClient(app=wrapped_app) as client:
+        response = await client.get("http://testserver/")
+    set_cookie = response.headers["set-cookie"]
+    assert "csrftoken" in set_cookie
+    assert "Path=/" in set_cookie
+    assert "Domain" not in set_cookie
+    assert "Secure" not in set_cookie
+    assert "SameSite=Lax" in set_cookie
