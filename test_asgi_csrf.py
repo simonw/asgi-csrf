@@ -116,7 +116,7 @@ async def test_asgi_csrf_sets_cookie(app_csrf):
         response = await client.get("http://localhost/")
     assert b'{"hello":"world"}' == response.content
     assert "csrftoken" in response.cookies
-    assert response.headers["set-cookie"].endswith("; Path=/")
+    assert response.headers["set-cookie"].endswith("; Path=/; SameSite=Lax")
     assert "Cookie" == response.headers["vary"]
 
 
@@ -126,7 +126,7 @@ async def test_asgi_csrf_modifies_existing_vary_header(app_csrf):
         response = await client.get("http://localhost/?_vary=User-Agent")
     assert b'{"hello":"world"}' == response.content
     assert "csrftoken" in response.cookies
-    assert response.headers["set-cookie"].endswith("; Path=/")
+    assert response.headers["set-cookie"].endswith("; Path=/; SameSite=Lax")
     assert "User-Agent, Cookie" == response.headers["vary"]
 
 

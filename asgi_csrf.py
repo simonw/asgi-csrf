@@ -117,7 +117,7 @@ def asgi_csrf_decorator(
                         cookie_attrs = [
                             "{}={}".format(cookie_name, csrftoken),
                             "Path={}".format(cookie_path),
-                            "SameSite={}".format(cookie_samesite)
+                            "SameSite={}".format(cookie_samesite),
                         ]
 
                         if cookie_domain is not None:
@@ -129,9 +129,7 @@ def asgi_csrf_decorator(
                         new_headers.append(
                             (
                                 b"set-cookie",
-                                "; ".join(cookie_attrs).encode(
-                                    "utf-8"
-                                ),
+                                "; ".join(cookie_attrs).encode("utf-8"),
                             )
                         )
                     event = {
