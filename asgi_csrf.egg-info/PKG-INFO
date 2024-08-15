@@ -1,3 +1,22 @@
+Metadata-Version: 2.1
+Name: asgi-csrf
+Version: 0.9
+Summary: ASGI middleware for protecting against CSRF attacks
+Home-page: https://github.com/simonw/asgi-csrf
+Author: Simon Willison
+License: Apache License, Version 2.0
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: itsdangerous
+Requires-Dist: python-multipart
+Provides-Extra: test
+Requires-Dist: pytest; extra == "test"
+Requires-Dist: pytest-asyncio; extra == "test"
+Requires-Dist: httpx>=0.16; extra == "test"
+Requires-Dist: starlette; extra == "test"
+Requires-Dist: pytest-cov; extra == "test"
+Requires-Dist: asgi-lifespan; extra == "test"
+
 # asgi-csrf
 
 [![PyPI](https://img.shields.io/pypi/v/asgi-csrf.svg)](https://pypi.org/project/asgi-csrf/)
@@ -100,47 +119,3 @@ app = asgi_csrf(
     skip_if_scope=skip_api_paths
 )
 ```
-
-## Customizing error messages
-
-You can customize the error messages produced by the CSRF protection middleware by providing a custom error message function. This function should accept an error message ID and return the corresponding error message.
-
-Here is an example of how to use the custom error message function:
-
-```python
-from asgi_csrf import asgi_csrf, ErrorMessageID
-
-def custom_error_message_function(message_id):
-    if message_id == ErrorMessageID.FORM_URLENCODED_MISMATCH:
-        return "Custom error message for form-urlencoded mismatch"
-    elif message_id == ErrorMessageID.MULTIPART_MISMATCH:
-        return "Custom error message for multipart mismatch"
-    elif message_id == ErrorMessageID.FILE_BEFORE_TOKEN:
-        return "Custom error message for file before token"
-    elif message_id == ErrorMessageID.UNKNOWN_CONTENT_TYPE:
-        return "Custom error message for unknown content type"
-    else:
-        return "Unknown error"
-
-app = asgi_csrf(
-    app,
-    signing_secret="secret-goes-here",
-    custom_error_message_function=custom_error_message_function
-)
-```
-
-In this example, the `custom_error_message_function` is defined to return custom error messages based on the error message ID. The `asgi_csrf` middleware is then configured to use this custom error message function by passing it as the `custom_error_message_function` parameter.
-
-The error message IDs are defined as an enum in the `asgi_csrf` module:
-
-```python
-from enum import Enum
-
-class ErrorMessageID(Enum):
-    FORM_URLENCODED_MISMATCH = 1
-    MULTIPART_MISMATCH = 2
-    FILE_BEFORE_TOKEN = 3
-    UNKNOWN_CONTENT_TYPE = 4
-```
-
-You can use these error message IDs to customize the error messages produced by the CSRF protection middleware.

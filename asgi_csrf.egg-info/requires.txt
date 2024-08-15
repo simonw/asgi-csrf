@@ -1,0 +1,10 @@
+itsdangerous
+python-multipart
+
+[test]
+pytest
+pytest-asyncio
+httpx>=0.16
+starlette
+pytest-cov
+asgi-lifespan

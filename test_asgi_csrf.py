@@ -2,7 +2,7 @@ from asgi_lifespan import LifespanManager
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
-from asgi_csrf import asgi_csrf
+from asgi_csrf import asgi_csrf, ErrorMessageID
 from itsdangerous.url_safe import URLSafeSerializer
 import httpx
 import json
@@ -364,3 +364,103 @@ async def test_asgi_lifespan():
                 cookies={"foo": "bar"},
             )
             assert 200 == response.status_code
+
+
+def custom_error_message_function(message_id):
+    if message_id == ErrorMessageID.FORM_URLENCODED_MISMATCH:
+        return "Custom error message for form-urlencoded mismatch"
+    elif message_id == ErrorMessageID.MULTIPART_MISMATCH:
+        return "Custom error message for multipart mismatch"
+    elif message_id == ErrorMessageID.FILE_BEFORE_TOKEN:
+        return "Custom error message for file before token"
+    elif message_id == ErrorMessageID.UNKNOWN_CONTENT_TYPE:
+        return "Custom error message for unknown content type"
+    else:
+        return "Unknown error"
+
+
+@pytest.mark.asyncio
+async def test_custom_error_message_function_form_urlencoded_mismatch(csrftoken):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(
+            hello_world_app,
+            signing_secret=SECRET,
+            custom_error_message_function=custom_error_message_function,
+        )
+    ) as client:
+        response = await client.post(
+            "http://localhost/",
+            cookies={"csrftoken": csrftoken},
+            data={"csrftoken": csrftoken[-1]},
+        )
+        assert response.status_code == 403
+        assert response.text == "Custom error message for form-urlencoded mismatch"
+
+
+@pytest.mark.asyncio
+async def test_custom_error_message_function_multipart_mismatch(csrftoken):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(
+            hello_world_app,
+            signing_secret=SECRET,
+            custom_error_message_function=custom_error_message_function,
+        )
+    ) as client:
+        response = await client.post(
+            "http://localhost/",
+            data={"csrftoken": csrftoken},
+            files={"csv": ("data.csv", "blah,foo\n1,2", "text/csv")},
+            cookies={"csrftoken": csrftoken[:-1]},
+        )
+        assert response.status_code == 403
+        assert response.text == "Custom error message for multipart mismatch"
+
+
+@pytest.mark.asyncio
+async def test_custom_error_message_function_file_before_token(csrftoken):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(
+            hello_world_app,
+            signing_secret=SECRET,
+            custom_error_message_function=custom_error_message_function,
+        )
+    ) as client:
+        request = httpx.Request(
+            url="http://localhost/",
+            method="POST",
+            data=(
+                b"--boo\r\n"
+                b'Content-Disposition: form-data; name="csv"; filename="data.csv"'
+                b"\r\nContent-Type: text/csv\r\n\r\n"
+                b"blah,foo\n1,2"
+                b"\r\n"
+                b"--boo\r\n"
+                b'Content-Disposition: form-data; name="csrftoken"\r\n\r\n'
+                + csrftoken.encode("utf-8")
+                + b"\r\n"
+                b"--boo--\r\n"
+            ),
+            headers={"content-type": "multipart/form-data; boundary=boo"},
+            cookies={"csrftoken": csrftoken},
+        )
+        response = await client.send(request)
+        assert response.status_code == 403
+        assert response.text == "Custom error message for file before token"
+
+
+@pytest.mark.asyncio
+async def test_custom_error_message_function_unknown_content_type(csrftoken):
+    async with httpx.AsyncClient(
+        app=asgi_csrf(
+            hello_world_app,
+            signing_secret=SECRET,
+            custom_error_message_function=custom_error_message_function,
+        )
+    ) as client:
+        response = await client.post(
+            "http://localhost/",
+            headers={"content-type": "application/octet-stream"},
+            cookies={"csrftoken": csrftoken},
+        )
+        assert response.status_code == 403
+        assert response.text == "Custom error message for unknown content type"
