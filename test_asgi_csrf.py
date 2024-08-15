@@ -237,7 +237,7 @@ async def test_multipart_failure_file_comes_before_token(csrftoken):
         request = httpx.Request(
             url="http://localhost/",
             method="POST",
-            data=(
+            content=(
                 b"--boo\r\n"
                 b'Content-Disposition: form-data; name="csv"; filename="data.csv"'
                 b"\r\nContent-Type: text/csv\r\n\r\n"
