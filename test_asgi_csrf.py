@@ -2,7 +2,7 @@ from asgi_lifespan import LifespanManager
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
-from asgi_csrf import asgi_csrf
+from asgi_csrf import asgi_csrf, Errors
 from itsdangerous.url_safe import URLSafeSerializer
 import httpx
 import json
@@ -45,6 +45,39 @@ def app_csrf():
     return asgi_csrf(hello_world_app, signing_secret=SECRET)
 
 
+async def custom_csrf_failed(scope, send, message_id):
+    assert scope["type"] == "http"
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 403,
+            "headers": [[b"content-type", b"text/html; charset=utf-8"]],
+        }
+    )
+    await send(
+        {
+            "type": "http.response.body",
+            "body": {
+                Errors.FORM_URLENCODED_MISMATCH: "custom form-urlencoded error",
+                Errors.MULTIPART_MISMATCH: "custom multipart error",
+                Errors.FILE_BEFORE_TOKEN: "custom file before token error",
+                Errors.UNKNOWN_CONTENT_TYPE: "custom unknown content type error",
+            }
+            .get(message_id, "")
+            .encode("utf-8"),
+        }
+    )
+
+
+@pytest.fixture
+def app_csrf_custom_errors():
+    return asgi_csrf(
+        hello_world_app,
+        signing_secret=SECRET,
+        send_csrf_failed=custom_csrf_failed,
+    )
+
+
 @pytest.fixture
 def csrftoken():
     return URLSafeSerializer(SECRET).dumps("token", "csrftoken")
@@ -60,11 +93,11 @@ async def test_hello_world_app():
 def test_signing_secret_if_none_provided(monkeypatch):
     app = asgi_csrf(hello_world_app)
     # Should be randomly generated
-    assert isinstance(app.__closure__[6].cell_contents.secret_key, bytes)
+    assert isinstance(app.__closure__[7].cell_contents.secret_key, bytes)
     # Should pick up `ASGI_CSRF_SECRET` if available
     monkeypatch.setenv("ASGI_CSRF_SECRET", "secret-from-environment")
     app2 = asgi_csrf(hello_world_app)
-    assert app2.__closure__[6].cell_contents.secret_key == b"secret-from-environment"
+    assert app2.__closure__[7].cell_contents.secret_key == b"secret-from-environment"
 
 
 @pytest.mark.asyncio
@@ -142,15 +175,24 @@ async def test_prevents_post_if_cookie_not_sent_in_post(app_csrf, csrftoken):
 
 
 @pytest.mark.asyncio
-async def test_prevents_post_if_cookie_not_sent_in_post(app_csrf, csrftoken):
-    async with httpx.AsyncClient(app=app_csrf) as client:
+@pytest.mark.parametrize("custom_errors", (False, True))
+async def test_prevents_post_if_cookie_not_sent_in_post(
+    custom_errors, app_csrf, app_csrf_custom_errors, csrftoken
+):
+    async with httpx.AsyncClient(
+        app=app_csrf_custom_errors if custom_errors else app_csrf
+    ) as client:
         response = await client.post(
             "http://localhost/",
             cookies={"csrftoken": csrftoken},
             data={"csrftoken": csrftoken[-1]},
         )
     assert 403 == response.status_code
-    assert response.text == "form-urlencoded POST field did not match cookie"
+    assert (
+        response.text == "custom form-urlencoded error"
+        if custom_errors
+        else "form-urlencoded POST field did not match cookie"
+    )
 
 
 @pytest.mark.asyncio
@@ -194,9 +236,14 @@ async def test_multipart(csrftoken):
 
 
 @pytest.mark.asyncio
-async def test_multipart_failure_wrong_token(csrftoken):
+@pytest.mark.parametrize("custom_errors", (False, True))
+async def test_multipart_failure_wrong_token(csrftoken, custom_errors):
     async with httpx.AsyncClient(
-        app=asgi_csrf(hello_world_app, signing_secret=SECRET)
+        app=asgi_csrf(
+            hello_world_app,
+            signing_secret=SECRET,
+            send_csrf_failed=custom_csrf_failed if custom_errors else None,
+        )
     ) as client:
         response = await client.post(
             "http://localhost/",
@@ -205,7 +252,11 @@ async def test_multipart_failure_wrong_token(csrftoken):
             cookies={"csrftoken": csrftoken[:-1]},
         )
         assert response.status_code == 403
-        assert response.text == "multipart/form-data POST field did not match cookie"
+        assert (
+            response.text == "custom multipart error"
+            if custom_errors
+            else "multipart/form-data POST field did not match cookie"
+        )
 
 
 class TrickEmptyDictionary(dict):
@@ -215,9 +266,14 @@ class TrickEmptyDictionary(dict):
 
 
 @pytest.mark.asyncio
-async def test_multipart_failure_missing_token(csrftoken):
+@pytest.mark.parametrize("custom_errors", (False, True))
+async def test_multipart_failure_missing_token(csrftoken, custom_errors):
     async with httpx.AsyncClient(
-        app=asgi_csrf(hello_world_app, signing_secret=SECRET)
+        app=asgi_csrf(
+            hello_world_app,
+            signing_secret=SECRET,
+            send_csrf_failed=custom_csrf_failed if custom_errors else None,
+        )
     ) as client:
         response = await client.post(
             "http://localhost/",
@@ -226,18 +282,27 @@ async def test_multipart_failure_missing_token(csrftoken):
             cookies={"csrftoken": csrftoken},
         )
         assert response.status_code == 403
-        assert response.text == "multipart/form-data POST field did not match cookie"
+        assert response.text == (
+            "custom multipart error"
+            if custom_errors
+            else "multipart/form-data POST field did not match cookie"
+        )
 
 
 @pytest.mark.asyncio
-async def test_multipart_failure_file_comes_before_token(csrftoken):
+@pytest.mark.parametrize("custom_errors", (False, True))
+async def test_multipart_failure_file_comes_before_token(csrftoken, custom_errors):
     async with httpx.AsyncClient(
-        app=asgi_csrf(hello_world_app, signing_secret=SECRET)
+        app=asgi_csrf(
+            hello_world_app,
+            signing_secret=SECRET,
+            send_csrf_failed=custom_csrf_failed if custom_errors else None,
+        )
     ) as client:
         request = httpx.Request(
             url="http://localhost/",
             method="POST",
-            data=(
+            content=(
                 b"--boo\r\n"
                 b'Content-Disposition: form-data; name="csv"; filename="data.csv"'
                 b"\r\nContent-Type: text/csv\r\n\r\n"
@@ -255,8 +320,9 @@ async def test_multipart_failure_file_comes_before_token(csrftoken):
         response = await client.send(request)
         assert response.status_code == 403
         assert (
-            response.text
-            == "File encountered before csrftoken - make sure csrftoken is first in the HTML"
+            response.text == "custom file before token error"
+            if custom_errors
+            else "File encountered before csrftoken - make sure csrftoken is first in the HTML"
         )
 
 

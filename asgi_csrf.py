@@ -1,4 +1,5 @@
 from http.cookies import SimpleCookie
+from enum import Enum
 import fnmatch
 from functools import wraps
 from multipart import FormParser
@@ -16,6 +17,21 @@ SCOPE_KEY = "csrftoken"
 ENV_SECRET = "ASGI_CSRF_SECRET"
 
 
+class Errors(Enum):
+    FORM_URLENCODED_MISMATCH = 1
+    MULTIPART_MISMATCH = 2
+    FILE_BEFORE_TOKEN = 3
+    UNKNOWN_CONTENT_TYPE = 4
+
+
+error_messages = {
+    Errors.FORM_URLENCODED_MISMATCH: "form-urlencoded POST field did not match cookie",
+    Errors.MULTIPART_MISMATCH: "multipart/form-data POST field did not match cookie",
+    Errors.FILE_BEFORE_TOKEN: "File encountered before csrftoken - make sure csrftoken is first in the HTML",
+    Errors.UNKNOWN_CONTENT_TYPE: "Unknown content-type",
+}
+
+
 def asgi_csrf_decorator(
     cookie_name=DEFAULT_COOKIE_NAME,
     http_header=DEFAULT_HTTP_HEADER,
@@ -25,7 +41,9 @@ def asgi_csrf_decorator(
     always_protect=None,
     always_set_cookie=False,
     skip_if_scope=None,
+    send_csrf_failed=None,
 ):
+    send_csrf_failed = send_csrf_failed or default_send_csrf_failed
     if signing_secret is None:
         signing_secret = os.environ.get(ENV_SECRET, None)
     if signing_secret is None:
@@ -144,9 +162,7 @@ def asgi_csrf_decorator(
                         return
                     else:
                         await send_csrf_failed(
-                            scope,
-                            wrapped_send,
-                            "form-urlencoded POST field did not match cookie",
+                            scope, wrapped_send, Errors.FORM_URLENCODED_MISMATCH
                         )
                         return
                 elif content_type == b"multipart/form-data":
@@ -168,14 +184,14 @@ def asgi_csrf_decorator(
                             await send_csrf_failed(
                                 scope,
                                 wrapped_send,
-                                "multipart/form-data POST field did not match cookie",
+                                Errors.MULTIPART_MISMATCH,
                             )
                             return
                     except FileBeforeToken:
                         await send_csrf_failed(
                             scope,
                             wrapped_send,
-                            "File encountered before csrftoken - make sure csrftoken is first in the HTML",
+                            Errors.FILE_BEFORE_TOKEN,
                         )
                         return
                     # Now replay the body
@@ -183,7 +199,7 @@ def asgi_csrf_decorator(
                     return
                 else:
                     await send_csrf_failed(
-                        scope, wrapped_send, message="Unknown content-type"
+                        scope, wrapped_send, Errors.UNKNOWN_CONTENT_TYPE
                     )
                     return
 
@@ -271,7 +287,7 @@ async def _parse_multipart_form_data(boundary, receive):
     return None, replay_receive
 
 
-async def send_csrf_failed(scope, send, message="CSRF check failed"):
+async def default_send_csrf_failed(scope, send, message_id):
     assert scope["type"] == "http"
     await send(
         {
@@ -280,6 +296,7 @@ async def send_csrf_failed(scope, send, message="CSRF check failed"):
             "headers": [[b"content-type", b"text/html; charset=utf-8"]],
         }
     )
+    message = error_messages.get(message_id) or "CSRF validation failed"
     await send({"type": "http.response.body", "body": message.encode("utf-8")})
 
 
@@ -292,6 +309,7 @@ def asgi_csrf(
     always_protect=None,
     always_set_cookie=False,
     skip_if_scope=None,
+    send_csrf_failed=None,
 ):
     return asgi_csrf_decorator(
         cookie_name,
@@ -301,6 +319,7 @@ def asgi_csrf(
         always_protect=always_protect,
         always_set_cookie=always_set_cookie,
         skip_if_scope=skip_if_scope,
+        send_csrf_failed=send_csrf_failed,
     )(app)
 
 
