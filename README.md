@@ -100,3 +100,45 @@ app = asgi_csrf(
     skip_if_scope=skip_api_paths
 )
 ```
+
+### send_csrf_failed
+
+By default, when a CSRF token is missing or invalid, the middleware will return a 403 Forbidden response page with a short error message.
+
+You can customize this behavior by passing a `send_csrf_failed` function to the middleware. This function should accept the ASGI `scope` and `send` functions, and the `message_id` of the error that occurred.
+
+The `message_id` will be an integer representing an item from the `asgi_csrf.Errors` enum.
+
+This example shows how you could customize the error message based on that `message_id`:
+
+```python
+async def custom_csrf_failed(scope, send, message_id):
+    assert scope["type"] == "http"
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 403,
+            "headers": [[b"content-type", b"text/html; charset=utf-8"]],
+        }
+    )
+    await send(
+        {
+            "type": "http.response.body",
+            "body": {
+                Errors.FORM_URLENCODED_MISMATCH: "custom form-urlencoded error",
+                Errors.MULTIPART_MISMATCH: "custom multipart error",
+                Errors.FILE_BEFORE_TOKEN: "custom file before token error",
+                Errors.UNKNOWN_CONTENT_TYPE: "custom unknown content type error",
+            }
+            .get(message_id, "")
+            .encode("utf-8"),
+        }
+    )
+
+
+app = asgi_csrf(
+    app,
+    signing_secret="secret-goes-here",
+    send_csrf_failed=custom_csrf_failed
+)
+```
