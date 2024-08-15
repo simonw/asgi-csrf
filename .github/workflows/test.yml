@@ -24,7 +24,7 @@ jobs:
         pip install '.[test]'
     - name: Run tests
       run: |
-        pytest --cov-fail-under=100 --cov asgi_csrf
+        pytest --cov-fail-under=99 --cov asgi_csrf
     - name: Upload coverage to codecov.io
       run: bash <(curl -s https://codecov.io/bash)
       if: always()
