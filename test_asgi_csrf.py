@@ -92,12 +92,22 @@ async def test_hello_world_app():
 
 def test_signing_secret_if_none_provided(monkeypatch):
     app = asgi_csrf(hello_world_app)
+
     # Should be randomly generated
-    assert isinstance(app.__closure__[7].cell_contents.secret_key, bytes)
+    def _get_secret_key(app):
+        found = [
+            cell.cell_contents
+            for cell in app.__closure__
+            if "URLSafeSerializer" in repr(cell)
+        ]
+        assert found
+        return found[0].secret_key
+
+    assert isinstance(_get_secret_key(app), bytes)
     # Should pick up `ASGI_CSRF_SECRET` if available
     monkeypatch.setenv("ASGI_CSRF_SECRET", "secret-from-environment")
     app2 = asgi_csrf(hello_world_app)
-    assert app2.__closure__[7].cell_contents.secret_key == b"secret-from-environment"
+    assert _get_secret_key(app2) == b"secret-from-environment"
 
 
 @pytest.mark.asyncio
