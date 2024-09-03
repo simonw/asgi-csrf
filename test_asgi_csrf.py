@@ -451,7 +451,8 @@ async def test_cookie_name(cookie_name):
     wrapped_app = asgi_csrf(
         hello_world_app, signing_secret="secret", cookie_name=cookie_name
     )
-    async with httpx.AsyncClient(app=wrapped_app) as client:
+    transport = httpx.ASGITransport(app=wrapped_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("http://testserver/")
     assert cookie_name in response.cookies
 
@@ -462,7 +463,8 @@ async def test_cookie_path(cookie_path):
     wrapped_app = asgi_csrf(
         hello_world_app, signing_secret="secret", cookie_path=cookie_path
     )
-    async with httpx.AsyncClient(app=wrapped_app) as client:
+    transport = httpx.ASGITransport(app=wrapped_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("http://testserver/")
     assert f"Path={cookie_path}" in response.headers["set-cookie"]
 
@@ -473,7 +475,8 @@ async def test_cookie_domain(cookie_domain):
     wrapped_app = asgi_csrf(
         hello_world_app, signing_secret="secret", cookie_domain=cookie_domain
     )
-    async with httpx.AsyncClient(app=wrapped_app) as client:
+    transport = httpx.ASGITransport(app=wrapped_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("http://testserver/")
     if cookie_domain:
         assert f"Domain={cookie_domain}" in response.headers["set-cookie"]
@@ -487,7 +490,8 @@ async def test_cookie_secure(cookie_secure):
     wrapped_app = asgi_csrf(
         hello_world_app, signing_secret="secret", cookie_secure=cookie_secure
     )
-    async with httpx.AsyncClient(app=wrapped_app) as client:
+    transport = httpx.ASGITransport(app=wrapped_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("http://testserver/")
     if cookie_secure:
         assert "Secure" in response.headers["set-cookie"]
@@ -501,7 +505,8 @@ async def test_cookie_samesite(cookie_samesite):
     wrapped_app = asgi_csrf(
         hello_world_app, signing_secret="secret", cookie_samesite=cookie_samesite
     )
-    async with httpx.AsyncClient(app=wrapped_app) as client:
+    transport = httpx.ASGITransport(app=wrapped_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("http://testserver/")
     assert f"SameSite={cookie_samesite}" in response.headers["set-cookie"]
 
@@ -509,7 +514,8 @@ async def test_cookie_samesite(cookie_samesite):
 @pytest.mark.asyncio
 async def test_default_cookie_options():
     wrapped_app = asgi_csrf(hello_world_app, signing_secret="secret")
-    async with httpx.AsyncClient(app=wrapped_app) as client:
+    transport = httpx.ASGITransport(app=wrapped_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("http://testserver/")
     set_cookie = response.headers["set-cookie"]
     assert "csrftoken" in set_cookie
