@@ -186,7 +186,7 @@ async def test_prevents_post_if_cookie_not_sent_in_post(app_csrf, csrftoken):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("custom_errors", (False, True))
-async def test_prevents_post_if_cookie_not_sent_in_post(
+async def test_prevents_post_if_cookie_different_than_data(
     custom_errors, app_csrf, app_csrf_custom_errors, csrftoken
 ):
     async with httpx.AsyncClient(
