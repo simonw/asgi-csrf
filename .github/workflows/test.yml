@@ -30,3 +30,12 @@ jobs:
       if: always()
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    - name: Build package to upload as artifact
+      run: |
+        pip install setuptools wheel build
+        python -m build
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-packages
+        path: dist/
