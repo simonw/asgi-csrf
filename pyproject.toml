@@ -1,0 +1,36 @@
+[project]
+name = "asgi-csrf"
+version = "0.1"
+description = "ASGI middleware for protecting against CSRF attacks"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{name = "Simon Willison"}]
+license = {text = "Apache-2.0"}
+classifiers = [
+    "License :: OSI Approved :: Apache Software License"
+]
+dependencies = [
+    "itsdangerous",
+    "python-multipart"
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+Homepage = "https://github.com/simonw/asgi-csrf"
+Changelog = "https://github.com/simonw/asgi-csrf/releases"
+Issues = "https://github.com/simonw/asgi-csrf/issues"
+CI = "https://github.com/simonw/asgi-csrf/actions"
+
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx>=0.16",
+    "starlette",
+    "pytest-cov",
+    "asgi-lifespan",
+]
