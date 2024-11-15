@@ -11,7 +11,7 @@ classifiers = [
 ]
 dependencies = [
     "itsdangerous",
-    "python-multipart"
+    "python-multipart>=0.0.13"
 ]
 
 [build-system]

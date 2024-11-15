@@ -2,7 +2,7 @@ from http.cookies import SimpleCookie
 from enum import Enum
 import fnmatch
 from functools import wraps
-from multipart import FormParser
+from python_multipart import FormParser
 import os
 from urllib.parse import parse_qsl
 from itsdangerous.url_safe import URLSafeSerializer
